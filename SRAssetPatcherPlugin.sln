@@ -1,0 +1,45 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.10.35013.160
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DFDCAssetPatcherPlugin", "DFDCAssetPatcherPlugin\DFDCAssetPatcherPlugin.csproj", "{71FA296A-9B6A-4CA5-83E7-35A3CE3B08D2}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SRHKAssetPatcherPlugin", "SRHKAssetPatcherPlugin\SRHKAssetPatcherPlugin.csproj", "{4ACFC9AD-5F6A-47B6-882F-3A12AB12F9B9}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "SRPluginShared", "SRPluginShared\SRPluginShared.shproj", "{B99CB7BD-A139-4978-9635-605AE6811AD7}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SRRAssetPatcherPlugin", "SRRAssetPatcherPlugin\SRRAssetPatcherPlugin.csproj", "{8F1C73F3-0BD9-450D-B268-B667CC2C1037}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{71FA296A-9B6A-4CA5-83E7-35A3CE3B08D2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{71FA296A-9B6A-4CA5-83E7-35A3CE3B08D2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{71FA296A-9B6A-4CA5-83E7-35A3CE3B08D2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{71FA296A-9B6A-4CA5-83E7-35A3CE3B08D2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4ACFC9AD-5F6A-47B6-882F-3A12AB12F9B9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4ACFC9AD-5F6A-47B6-882F-3A12AB12F9B9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4ACFC9AD-5F6A-47B6-882F-3A12AB12F9B9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4ACFC9AD-5F6A-47B6-882F-3A12AB12F9B9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8F1C73F3-0BD9-450D-B268-B667CC2C1037}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8F1C73F3-0BD9-450D-B268-B667CC2C1037}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8F1C73F3-0BD9-450D-B268-B667CC2C1037}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8F1C73F3-0BD9-450D-B268-B667CC2C1037}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {AEAFF2B6-2D4D-4FD1-8EA8-697CA9B68046}
+	EndGlobalSection
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		SRPluginShared\SRPluginShared.projitems*{4acfc9ad-5f6a-47b6-882f-3a12ab12f9b9}*SharedItemsImports = 5
+		SRPluginShared\SRPluginShared.projitems*{71fa296a-9b6a-4ca5-83e7-35a3ce3b08d2}*SharedItemsImports = 5
+		SRPluginShared\SRPluginShared.projitems*{8f1c73f3-0bd9-450d-b268-b667cc2c1037}*SharedItemsImports = 5
+		SRPluginShared\SRPluginShared.projitems*{b99cb7bd-a139-4978-9635-605ae6811ad7}*SharedItemsImports = 13
+	EndGlobalSection
+EndGlobal
