@@ -1,7 +1,30 @@
-# SRMusicPatcherTemplate
-BepInEx based mod. Allows dynamically replacing music tracks without needing to work with asset bundles. Just drop your replacement tracks into the appropriate folder, modify the .cfg file, install the plugin, and launch the game!
+# SRAssetPatcherPlugin
+BepInEx based mod. 
 
 This is based on SRPlugin.
+
+Okay, let's be real here folks, this is a rough draft. I have tested it with exactly one clip, with an assetName of "Music/HongKong-TitleTheme-UI", which I used this plugin to swap in for the starting music.
+Your .cfg would look something like this:
+
+	[Features]
+	MusicPatcherEnabled = true
+	
+	[Replacements]
+	
+	whatever-you-want.asset = Music/HongKong-TitleTheme-UI
+	whatever-you-want.file = ..\musicpatches\theme.wav
+	
+	aslong-asit-matches.asset = Music/Surely-There-Must-Be-Others
+	aslong-asit-matches.file = ..\..\some\other\folder\anotherwav.wav
+
+
+And right now it only even attempts to work by converting a .WAV on disk to an AudioClip, and only specifically for Music requests. I plan to add more functionality.
+
+At the moment, the WAV to AudioClip conversion is courtesy of [WavUtility.cs by deadlyfingers](https://github.com/deadlyfingers/UnityWav). Thank you, deadlyfingers.
+
+That said, yes, I would like to see this expanded to allow for more dynamic loading options. And efficiently, too. The current implementation does no caching, for example. But.... beyond all of that... yes, the following could be said:
+
+Allows dynamically replacing music tracks without needing to work with asset bundles. Just drop your replacement tracks into the appropriate folder, modify the .cfg file, install the plugin, and launch the game!
 
 To use this mod:
 
