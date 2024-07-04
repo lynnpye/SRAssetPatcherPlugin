@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using UnityEngine;
 
 namespace SRPlugin
 {
@@ -28,6 +29,21 @@ namespace SRPlugin
                     _assemblyPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
                 }
                 return _assemblyPath;
+            }
+        }
+
+        public static string AssetOverrideRoot
+        {
+            get
+            {
+#if false
+                if (_assemblyPath == null)
+                {
+                    _assemblyPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                }
+                return _assemblyPath;
+#endif
+                return Application.persistentDataPath;
             }
         }
 

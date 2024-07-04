@@ -11,7 +11,6 @@
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)FeatureImpl.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Features\MusicPatcherFeature\MusicPatcherFeature.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Features\MusicPatcherFeature\WavUtility.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)OverrideableValue.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)PatchRecord.cs" />
     <Compile Include="..\SRPluginShared\PrivateEye.cs" />

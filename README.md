@@ -20,7 +20,11 @@ Your .cfg would look something like this:
 
 And right now it only even attempts to work by converting a .WAV on disk to an AudioClip, and only specifically for Music requests. I plan to add more functionality.
 
-At the moment, the WAV to AudioClip conversion is courtesy of [WavUtility.cs by deadlyfingers](https://github.com/deadlyfingers/UnityWav). Thank you, deadlyfingers.
+This is no longer true, as I've switched to using the UnityEngine.WWW class do the loading, which means I can now *drumroll* handle WAV *and* OGG. Yay.
+
+>At the moment, the WAV to AudioClip conversion is courtesy of [WavUtility.cs by deadlyfingers](https://github.com/deadlyfingers/UnityWav). Thank you, deadlyfingers.
+
+I would not have gone as far as I have without that code to start with.
 
 That said, yes, I would like to see this expanded to allow for more dynamic loading options. And efficiently, too. The current implementation does no caching, for example. But.... beyond all of that... yes, the following could be said:
 
@@ -37,24 +41,22 @@ When installing BepInEx to the game folder, a 'BepInEx/' folder was created. The
 
 Edit 'BepInEx.cfg', finding the [Preloader.Entrypoint] section and changing the 'Type' value to 'Camera'. That section should now look like this:
 
-```
-[Preloader.Entrypoint]
+	[Preloader.Entrypoint]
+	
+	## The local filename of the assembly to target.
+	# Setting type: String
+	# Default value: UnityEngine.dll
+	Assembly = UnityEngine.dll
 
-## The local filename of the assembly to target.
-# Setting type: String
-# Default value: UnityEngine.dll
-Assembly = UnityEngine.dll
+	## The name of the type in the entrypoint assembly to search for the entrypoint method.
+	# Setting type: String
+	# Default value: Application
+	Type = Camera
 
-## The name of the type in the entrypoint assembly to search for the entrypoint method.
-# Setting type: String
-# Default value: Application
-Type = Camera
-
-## The name of the method in the specified entrypoint assembly and type to hook and load Chainloader from.
-# Setting type: String
-# Default value: .cctor
-Method = .cctor
-```
+	## The name of the method in the specified entrypoint assembly and type to hook and load Chainloader from.
+	# Setting type: String
+	# Default value: .cctor
+	Method = .cctor
 
 ## Developing your BepInEx plugin (i.e. your mod)
 ### For Shadowrun Returns

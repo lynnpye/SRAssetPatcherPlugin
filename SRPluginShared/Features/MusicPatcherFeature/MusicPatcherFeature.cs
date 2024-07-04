@@ -34,7 +34,7 @@ keyofyourchoosing.file = ..\some\folder\file.wav
 anotherkey.asset = another/asset-lookup-name
 anotherkey.file = c:\maybe\a\full\path\file.wav
 
-Relative paths will start from the ""{SRPlugin.AssemblyPath}"" folder. Note how 'keyofyourchoosing' and 'anotherkey' are the
+Relative paths will start from the ""{SRPlugin.AssetOverrideRoot}"" folder. Note how 'keyofyourchoosing' and 'anotherkey' are the
 first part of two keys, each ending in '.asset' and '.file'. You can pick the first part and need to make it distinct between
 your various replacements, and the second part says which entry it is, the asset or the file path.
 
@@ -55,7 +55,17 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
                     (CIMusicPatcherEnabled = new ConfigItem<bool>(FEATURES_SECTION, nameof(MusicPatcherEnabled), true, GetLongDescription()))
                 }, new List<PatchRecord>()
                 {
-                    PatchRecord.Postfix(typeof(Resources).GetMethod(nameof(Resources.Load)), typeof(ResourcesPatch).GetMethod(nameof(ResourcesPatch.LoadPostfix), [typeof(string), typeof(Type)]))
+                    PatchRecord.Postfix(
+                        typeof(Resources)
+                            .GetMethod(
+                                nameof(Resources.Load),
+                                [typeof(string), typeof(Type)]
+                            ),
+                        typeof(ResourcesPatch)
+                            .GetMethod(
+                                nameof(ResourcesPatch.LoadPostfix)
+                                )
+                        )
                 })
         {
 
@@ -126,7 +136,7 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
             var root = Path.GetPathRoot(filePath);
             if (!(root.StartsWith(@"\") || root.EndsWith(@"\") && root != @"\"))
             {
-                filePath = Path.Combine(SRPlugin.AssemblyPath, filePath);
+                filePath = Path.GetFullPath(Path.Combine(Application.persistentDataPath, filePath));
             }
             return filePath;
         }
@@ -146,8 +156,8 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
 
         public override void HandleEnabled()
         {
-            SRPlugin.Logger.LogInfo($"\n\n\n OI    Application.dataPath = '{Application.dataPath}'");
-            SRPlugin.Logger.LogInfo($"\n\n\n OI    Application.persistentDataPath = '{Application.persistentDataPath}'");
+            SRPlugin.Logger.LogInfo(string.Format("\n{0}{0}\n{1}\n\n{0}{0}", "=========\n", $""));
+            PopulateReplacements();
         }
 
         /*//////*/
@@ -157,27 +167,59 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
             public AudioClip clip;
         }
 
-        private static IEnumerator<WWW> GetWWWAudioClip(string filePath, AudioClipBox box)
+        private static IEnumerator<WWW> GetWWWAudioClip(string wwwUri, AudioClipBox box)
         {
-            using (var www = new WWW(filePath))
+            using (var www = new WWW(wwwUri))
             {
-                yield return www;
+                while (!www.isDone)
+                {
+                    SRPlugin.Logger.LogInfo(string.Format("\n{0}{0}\n{1}\n\n{0}{0}", "=========\n", $"not done, pre-yield: www.isDone:{www.isDone}  progress:{www.progress}:"));
+                    if (!www.isDone)
+                    {
+                        yield return www;
+                    }
+                }
 
-
-
-                SRPlugin.Logger.LogInfo($"\n\n www uri {www.url}   progress:{www.progress}   error:{www.error}");
-
-                box.clip = www.GetAudioClip(false);
+                if (www.isDone)
+                {
+                    SRPlugin.Logger.LogInfo(string.Format("\n{0}{0}\n{1}\n\n{0}{0}", "=========\n", $"GetWWWAudioClip: www.isDone:{www.isDone}:  progress:{www.progress}:"));
+                    box.clip = www.GetAudioClip(false, true);
+                }
             }
+        }
+
+        private static bool IsKnownMusicSuffix(string filePath)
+        {
+            List<string> knownMusicSuffixes = new List<string>([
+                ".wav", ".ogg"
+            ]);
+
+            bool isKnown = knownMusicSuffixes.Exists(s => filePath.ToLower().EndsWith(s));
+
+            if (!isKnown)
+            {
+                SRPlugin.Logger.LogInfo(string.Format("\n{0}{0}\n{1}\n\n{0}{0}", "=========\n", $"unknown music suffix for {filePath}"));
+            }
+
+            return isKnown;
         }
 
         private static UnityEngine.Object GetReplacementUnityObjectFromFile(string assetPath, string filePath)
         {
-            if (assetPath.StartsWith("Music/") && assetPath.Length > 6 && filePath.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+            if (assetPath.StartsWith("Music/") && assetPath.Length > 6 && IsKnownMusicSuffix(filePath))
             {
-                byte[] fileBytes = File.ReadAllBytes(filePath);
-                var uo = WavUtility.ToAudioClip(fileBytes, 0);
-                uo.name = assetPath.Substring(6);
+                AudioClipBox clipHolder = new AudioClipBox();
+
+                var uri = new Uri(filePath);
+                var wenum = GetWWWAudioClip(uri.ToString().Replace(" ", "%20"), clipHolder);
+
+                // waiting for the thing to complete the fetch
+                while (wenum.MoveNext()) ;
+
+                // and clipHolder should now have our audioClip!
+                var uo = clipHolder.clip;
+                SRPlugin.Logger.LogInfo(string.Format("\n{0}{0}\n{1}\n\n{0}{0}", "=========\n", $"loading {filePath} as music"));
+
                 return uo;
             }
 
@@ -210,6 +252,11 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
 
                     __result = uobj;
                 }
+            }
+
+            public static void LoadPostfix2(ref UnityEngine.Object __result, string path, Type typeRef = null)
+            {
+
             }
         }
     }
