@@ -134,7 +134,12 @@ namespace SRPlugin
             }
         }
 
-        public virtual void HandleEnabled()
+        public virtual void PreApplyPatches()
+        {
+
+        }
+
+        public virtual void PostApplyPatches()
         {
 
         }
@@ -192,8 +197,9 @@ namespace SRPlugin
         {
             if (IsEnabled())
             {
-                HandleEnabled();
+                PreApplyPatches();
                 ApplyPatches();
+                PostApplyPatches();
             }
             else
             {
