@@ -10,8 +10,124 @@ namespace SRPlugin.Features.MusicPatcherFeature
     internal class MusicPatcherFeature : FeatureImpl
     {
         private static ConfigItem<bool> CIMusicPatcherEnabled;
+        private static ConfigItem<bool> CILogMusicAssetsRequested;
+
+        public MusicPatcherFeature()
+            : base(new List<ConfigItemBase>
+                {
+                    (CIMusicPatcherEnabled = new ConfigItem<bool>(FEATURES_SECTION, nameof(MusicPatcherEnabled), true, GetLongDescription())),
+                    (CILogMusicAssetsRequested = new ConfigItem<bool>(FEATURES_SECTION, nameof(LogMusicAssetsRequested), false, "outputs each asset request prefixed with the string 'Music/', to help aid in finding a specific music asset name")),
+                }, new List<PatchRecord>()
+                {
+                    PatchRecord.Postfix(
+                        typeof(Resources)
+                            .GetMethod(
+                                nameof(Resources.Load),
+                                [typeof(string)]
+                            ),
+                        typeof(ResourcesPatch)
+                            .GetMethod(
+                                nameof(ResourcesPatch.LoadPostfixWithPath)
+                                )
+                        ),
+                    PatchRecord.Postfix(
+                        typeof(Resources)
+                            .GetMethod(
+                                nameof(Resources.Load),
+                                [typeof(string), typeof(Type)]
+                            ),
+                        typeof(ResourcesPatch)
+                            .GetMethod(
+                                nameof(ResourcesPatch.LoadPostfixWithPathAndType)
+                                )
+                        ),
+#if SRR
+                    PatchRecord.Prefix(
+                        //typeof(SoundManager).GetMethod("SetupMusicPrefab"),
+                        AccessTools.Method(typeof(SoundManager), "SetupMusicPrefab"),
+                        typeof(SoundManagerPatch).GetMethod(nameof(SoundManagerPatch.SetupMusicPrefabPrefix))
+                        ),
+#endif
+#if !SRR && SRR
+                    PatchRecord.Prefix(
+                        AccessTools.Method(typeof(SoundManager), "SetupMusicSource"),
+                        typeof(SoundManagerPatch).GetMethod(nameof(SoundManagerPatch.SetupMusicSourcePrefix))
+                        ),
+#endif
+                })
+        {
+
+        }
+
+        public override void PreApplyPatches()
+        {
+            PopulateReplacements();
+        }
+
+        public static bool MusicPatcherEnabled { get => CIMusicPatcherEnabled.GetValue(); set => CIMusicPatcherEnabled.SetValue(value); }
+        public static bool LogMusicAssetsRequested { get => CILogMusicAssetsRequested.GetValue(); set => CILogMusicAssetsRequested.SetValue(value); }
+
         private static Dictionary<string, string> ReplacementAssetLocations = new Dictionary<string, string>();
+
+        private static Dictionary<string, AudioClip> ReplacementAssetSamples = new Dictionary<string, AudioClip>();
+        private static Dictionary<string, AudioClipDataBucket> ReplacementAssetDataBuckets = new Dictionary<string, AudioClipDataBucket>();
+
         private static string REPLACEMENTS_SECTION = "MusicReplacements";
+
+        public class AudioClipDataBucket
+        {
+            public float[] samples
+            {
+                get; set;
+            }
+            public int channels
+            {
+                get; set;
+            }
+            public int frequency
+            {
+                get; set;
+            }
+            public string name
+            {
+                get; set;
+            }
+            public HideFlags hideFlags
+            {
+                get; set;
+            }
+            public bool _3D
+            {
+                get; set;
+            }
+
+            public AudioClipDataBucket(AudioClip audioClip)
+            {
+                this.channels = audioClip.channels;
+                this.frequency = audioClip.frequency;
+                float[] _samples = new float[audioClip.samples * audioClip.channels];
+                audioClip.GetData(_samples, 0);
+                this.samples = _samples;
+                this.name = audioClip.name;
+                this.hideFlags = audioClip.hideFlags;
+            }
+
+            // may I find comfort from a higher power
+            private static HashSet<int> _knownClips = new HashSet<int>();
+            private static HashSet<int> KnownClips { get => _knownClips ??= new HashSet<int>(); }
+            
+            public AudioClip ClipFromBucket()
+            {
+                var newClip = AudioClip.Create(this.name, this.samples.Length, this.channels, this.frequency, false, false);
+
+                KnownClips.Add(newClip.GetInstanceID());
+
+                newClip.SetData(this.samples, 0);
+                newClip.hideFlags = this.hideFlags;
+
+                return newClip;
+            }
+        }
 
         private class ReplacementItem
         {
@@ -47,28 +163,6 @@ hktitletheme.file = ..\musicpatches\theme.wav
 
 MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
 ";
-        }
-
-        public MusicPatcherFeature()
-            : base(new List<ConfigItemBase>
-                {
-                    (CIMusicPatcherEnabled = new ConfigItem<bool>(FEATURES_SECTION, nameof(MusicPatcherEnabled), true, GetLongDescription()))
-                }, new List<PatchRecord>()
-                {
-                    PatchRecord.Postfix(
-                        typeof(Resources)
-                            .GetMethod(
-                                nameof(Resources.Load),
-                                [typeof(string), typeof(Type)]
-                            ),
-                        typeof(ResourcesPatch)
-                            .GetMethod(
-                                nameof(ResourcesPatch.LoadPostfix)
-                                )
-                        )
-                })
-        {
-
         }
 
         private static void PopulateReplacements()
@@ -141,25 +235,6 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
             return filePath;
         }
 
-        public static bool MusicPatcherEnabled
-        {
-            get
-            {
-                return CIMusicPatcherEnabled.GetValue();
-            }
-
-            set
-            {
-                CIMusicPatcherEnabled.SetValue(value);
-            }
-        }
-
-        public override void HandleEnabled()
-        {
-            SRPlugin.Logger.LogInfo(string.Format("\n{0}{0}\n{1}\n\n{0}{0}", "=========\n", $""));
-            PopulateReplacements();
-        }
-
         /*//////*/
 
         private class AudioClipBox
@@ -173,7 +248,6 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
             {
                 while (!www.isDone)
                 {
-                    SRPlugin.Logger.LogInfo(string.Format("\n{0}{0}\n{1}\n\n{0}{0}", "=========\n", $"not done, pre-yield: www.isDone:{www.isDone}  progress:{www.progress}:"));
                     if (!www.isDone)
                     {
                         yield return www;
@@ -182,48 +256,148 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
 
                 if (www.isDone)
                 {
-                    SRPlugin.Logger.LogInfo(string.Format("\n{0}{0}\n{1}\n\n{0}{0}", "=========\n", $"GetWWWAudioClip: www.isDone:{www.isDone}:  progress:{www.progress}:"));
-                    box.clip = www.GetAudioClip(false, true);
+                    box.clip = www.GetAudioClip(false, false);
                 }
             }
         }
 
-        private static bool IsKnownMusicSuffix(string filePath)
+        private static bool IsMusicAssetPath(string assetPath)
         {
-            List<string> knownMusicSuffixes = new List<string>([
-                ".wav", ".ogg"
-            ]);
-
-            bool isKnown = knownMusicSuffixes.Exists(s => filePath.ToLower().EndsWith(s));
-
-            if (!isKnown)
-            {
-                SRPlugin.Logger.LogInfo(string.Format("\n{0}{0}\n{1}\n\n{0}{0}", "=========\n", $"unknown music suffix for {filePath}"));
-            }
-
-            return isKnown;
+            return assetPath.StartsWith("Music/") && assetPath.Length > 6;
         }
 
-        private static UnityEngine.Object GetReplacementUnityObjectFromFile(string assetPath, string filePath)
+        private static AudioClip GetReplacementUnityObjectFromFile(string assetPath, string filePath)
         {
-            if (assetPath.StartsWith("Music/") && assetPath.Length > 6 && IsKnownMusicSuffix(filePath))
+            if (IsMusicAssetPath(assetPath))
             {
                 AudioClipBox clipHolder = new AudioClipBox();
 
                 var uri = new Uri(filePath);
-                var wenum = GetWWWAudioClip(uri.ToString().Replace(" ", "%20"), clipHolder);
+                var wenum = GetWWWAudioClip(uri.ToString(), clipHolder);
 
                 // waiting for the thing to complete the fetch
                 while (wenum.MoveNext()) ;
 
                 // and clipHolder should now have our audioClip!
                 var uo = clipHolder.clip;
-                SRPlugin.Logger.LogInfo(string.Format("\n{0}{0}\n{1}\n\n{0}{0}", "=========\n", $"loading {filePath} as music"));
 
                 return uo;
             }
 
             return null;
+        }
+
+        private static void StandoutLog(string msg, params object[] args)
+        {
+            string bar = "*X*X*X*X*X*X*X*X*X*X";
+            SRPlugin.Logger.LogInfo(string.Format("\n{1}\n\n{0}\n\n{1}\n", string.Format(msg, args), bar));
+        }
+
+        private static void PostfixLoad(ref UnityEngine.Object __result, string path)
+        {
+#if SRR && !SRR
+            if (!path.EndsWith("-Prefab"))
+            {
+                PostfixLoad_AudioClip(ref __result, path);
+                return;
+            }
+#else
+            PostfixLoad_AudioClip(ref __result, path);
+#endif
+        }
+
+        private static void PostfixLoad_AudioClip(ref UnityEngine.Object __result, string path)
+        {
+            AudioClip clip = GetClipFromPath(path);
+            if (clip == null)
+            {
+                StandoutLog($"Tried to load/retrieve audio clip {path} and got null");
+                return;
+            }
+            __result = clip;
+        }
+
+        // may I find comfort from a higher power
+        private static HashSet<int> _knownClips = null;
+        private static HashSet<int> KnownClips { get => _knownClips ??= new HashSet<int>(); }
+
+        private static AudioClip GetClipFromPath(string path)
+        {
+            AudioClipDataBucket theBucket = null;
+
+            if (ReplacementAssetDataBuckets.ContainsKey(path))
+            {
+                theBucket = ReplacementAssetDataBuckets[path];
+            }
+
+            if (ReplacementAssetLocations.ContainsKey(path))
+            {
+                string filePath = ReplacementAssetLocations[path];
+
+                AudioClip uobj = GetReplacementUnityObjectFromFile(path, filePath);
+
+                if (uobj == null)
+                {
+                    SRPlugin.Logger.LogInfo($"Unable to convert file \"{filePath}\" to UnityEngine.Object");
+                    return null;
+                }
+                uobj.name = path.Substring(6);
+
+                // ReplacementAssetSamples[path] = uobj;
+                theBucket = new AudioClipDataBucket(uobj);
+                ReplacementAssetDataBuckets[path] = theBucket;
+            }
+
+            AudioClip theClip = null;
+            if (theBucket != null)
+            {
+                theClip = theBucket.ClipFromBucket();
+                theClip.name = theBucket.name;
+                KnownClips.Add(theClip.GetInstanceID());
+            }
+
+            return theClip;
+        }
+
+        private static void CloneGameObjectAudioClip(string path, AudioSource resultAudioSource)
+        {
+            // no clones for good clips
+            if (resultAudioSource != null && resultAudioSource.clip != null && KnownClips.Contains(resultAudioSource.clip.GetInstanceID()))
+            {
+                return;
+            }
+            
+            AudioClip clip = GetClipFromPath(path);
+
+            if (clip != null)
+            {
+                resultAudioSource.clip = clip;
+                resultAudioSource.loop = true;
+                resultAudioSource.playOnAwake = true;
+                
+                return;
+            }
+
+            return;
+        }
+
+        private static void LogMusicAssetRequest(string path, Type systemTypeInstance = null)
+        {
+            if (!LogMusicAssetsRequested) return;
+
+            var label = 
+                systemTypeInstance == null
+                ? $".asset = {path})"
+                : $".asset = {path} (expecting typeof {systemTypeInstance}, this is probably not interesting)"
+                ;
+
+            var msg = "";
+            if (path.EndsWith("-Prefab"))
+            {
+                msg += $"\n-- Prefab was requested; If you want to replace this one, try <yourReplacementKey>.asset = {path.Substring(0, path.Length - 7)}";
+            }
+
+            StandoutLog($"LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL\n{label}{msg}");
         }
 
         [HarmonyPatch(typeof(Resources))]
@@ -236,28 +410,218 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
                 nameof(Resources.Load),
                 [typeof(string), typeof(Type)]
                 )]
-            public static void LoadPostfix(ref UnityEngine.Object __result, string path)
+            public static void LoadPostfixWithPathAndType(ref UnityEngine.Object __result, string path, Type systemTypeInstance)
             {
-                if (ReplacementAssetLocations.ContainsKey(path))
-                {
-                    string filePath = ReplacementAssetLocations[path];
+                if (!IsMusicAssetPath(path)) return;
 
-                    UnityEngine.Object uobj = GetReplacementUnityObjectFromFile(path, filePath);
+                LogMusicAssetRequest(path, systemTypeInstance );
 
-                    if (uobj == null)
-                    {
-                        SRPlugin.Logger.LogInfo($"Unable to convert file \"{filePath}\" to UnityEngine.Object");
-                        uobj = __result;
-                    }
-
-                    __result = uobj;
-                }
+                PostfixLoad(ref __result, path);
             }
 
-            public static void LoadPostfix2(ref UnityEngine.Object __result, string path, Type typeRef = null)
+            [HarmonyPostfix]
+            [HarmonyPatch(
+                typeof(Resources),
+                nameof(Resources.Load),
+                [typeof(string)]
+                )]
+            public static void LoadPostfixWithPath(ref UnityEngine.Object __result, string path)
             {
+                if (!IsMusicAssetPath(path)) return;
 
+                LogMusicAssetRequest(path);
+
+                PostfixLoad(ref __result, path);
             }
         }
+
+#if SRR
+        [HarmonyPatch(typeof(SoundManager))]
+        public class SoundManagerPatch
+        {
+            [HarmonyPrefix]
+            [HarmonyPatch(typeof(SoundManager), "SetupMusicPrefab")]
+            public static bool SetupMusicPrefabPrefix(ref AudioSource __result, SoundManager __instance, string sound,
+                ref GameObject ___musicObject, ref GameObject ___musicObjectPrevious, ref string ___musicSourceName, ref string ___musicSourceNamePrevious,
+                ref AudioSource ___musicSource, ref AudioSource ___musicSourcePrevious)
+            {
+                if (___musicObject != null)
+                {
+                    if (string.Compare(___musicSourceName, sound, StringComparison.OrdinalIgnoreCase) == 0)
+                    {
+                        AudioSource resultAudioSource = ___musicObject.GetComponent<AudioSource>();
+
+                        CloneGameObjectAudioClip("Music/" + sound, resultAudioSource);
+
+                        __result = resultAudioSource;
+                        return false;
+                    }
+                    AudioSource audioSource = ___musicObject.GetComponent<AudioSource>();
+                    if (audioSource != null)
+                    {
+                        audioSource.Stop();
+                    }
+                    if (___musicObjectPrevious != null)
+                    {
+                        if (string.Compare(___musicSourceNamePrevious, sound, StringComparison.OrdinalIgnoreCase) == 0)
+                        {
+                            GameObject gameObject = ___musicObject;
+                            string text = ___musicSourceName;
+                            ___musicObject = ___musicObjectPrevious;
+                            ___musicSourceName = ___musicSourceNamePrevious;
+                            ___musicObjectPrevious = gameObject;
+                            ___musicSourceNamePrevious = text;
+                            ___musicSource = ___musicObject.GetComponent<AudioSource>();
+
+                            CloneGameObjectAudioClip("Music/" + sound, ___musicSource);
+
+#if !SRR
+// a holdover from when these patches were going to apply to more than SRR
+                            __instance.AuditMusicTwo();
+#endif
+                            __result = ___musicSource;
+                            return false;
+                        }
+                        audioSource = ___musicObjectPrevious.GetComponent<AudioSource>();
+                        if (audioSource != null)
+                        {
+                            Resources.UnloadAsset(audioSource.clip);
+                        }
+                    }
+                    ___musicObjectPrevious = ___musicObject;
+                    ___musicObject = null;
+                    ___musicSourceNamePrevious = ___musicSourceName;
+                    ___musicSourceName = string.Empty;
+                }
+
+                GameObject gameObject2 = Resources.Load("Music/" + sound + "-Prefab", typeof(GameObject)) as GameObject;
+                if (gameObject2 != null)
+                {
+                    ___musicObject = global::UnityEngine.Object.Instantiate(gameObject2) as GameObject;
+                    ___musicSource = ___musicObject.GetComponent<AudioSource>();
+
+                    CloneGameObjectAudioClip("Music/" + sound, ___musicSource);
+
+                    ___musicSourceName = sound;
+                    SoundManager.SoundType soundType = SoundManager.SoundType.Music;
+                    int num = (int)soundType;
+                    AudioSource unusedSource = SoundManager.GetUnusedSource(soundType);
+                    GameObject gameObject3 = unusedSource.gameObject;
+                    ___musicObject.transform.parent = unusedSource.gameObject.transform.parent;
+
+                    int[] numSources = PrivateEye.GetPrivateFieldValue<int[]>(LazySingletonBehavior<SoundManager>.Instance, "numSources", null);
+                    AudioSource[,] sources = PrivateEye.GetPrivateFieldValue<AudioSource[,]>(LazySingletonBehavior<SoundManager>.Instance, "sources", null);
+                    for (int i = 0; i < numSources[num]; i++)
+                    {
+                        if (sources[num, i] == unusedSource)
+                        {
+                            sources[num, i] = ___musicSource;
+                            ___musicObject.name = gameObject3.name;
+                            ___musicObject.transform.parent = gameObject3.transform.parent;
+                            global::UnityEngine.Object.Destroy(unusedSource);
+                            global::UnityEngine.Object.Destroy(gameObject3);
+                            break;
+                        }
+                    }
+#if !SRR
+// a holdover from when these patches were going to apply to more than SRR
+                    __instance.AuditMusicTwo();
+#endif
+                }
+                else
+                {
+                    ___musicSource =
+                        AccessTools.Method(typeof(SoundManager), "SetupMusicSource", [typeof(string)]).Invoke(__instance, [sound])
+                        as AudioSource;
+                }
+
+                __result = ___musicSource;
+                return false;
+            }
+
+#if !SRR && SRR
+// a holdover from when these patches were going to apply to more than SRR
+// variables are purposefully set to be false always
+// want to retain the code but never risk compiling it
+            [HarmonyPrefix]
+            [HarmonyPatch(typeof(SoundManager), "SetupMusicSource")]
+            public static bool SetupMusicSourcePrefix(ref AudioSource __result, SoundManager __instance, string sound,
+                ref GameObject ___musicObject, ref GameObject ___musicObjectPrevious, ref string ___musicSourceName, ref string ___musicSourceNamePrevious,
+                ref AudioSource ___musicSource, ref AudioSource ___musicSourcePrevious)
+            {
+
+                StandoutLog($"source {sound} ping 0");
+                if (string.Compare(___musicSourceName, sound, StringComparison.OrdinalIgnoreCase) == 0)
+                {
+                    StandoutLog($"source {sound} ping 1");
+                    CloneGameObjectAudioClip("Music/" + sound, ___musicSource);
+#if !SRR
+// a holdover from when these patches were going to apply to more than SRR
+                    __instance.AuditMusicTwo();
+#endif
+
+                    __result = ___musicSource;
+                    return false;
+                }
+                if (string.Compare(___musicSourceNamePrevious, sound, StringComparison.OrdinalIgnoreCase) == 0)
+                {
+                    StandoutLog($"source {sound} ping 2");
+                    ___musicSource.Stop();
+                    AudioSource audioSource = ___musicSource;
+                    ___musicSourceNamePrevious = ___musicSourceName;
+                    ___musicSource = ___musicSourcePrevious;
+                    ___musicSourceName = sound;
+                    ___musicSourcePrevious = audioSource;
+
+                    CloneGameObjectAudioClip("Music/" + sound, ___musicSource);
+#if !SRR
+// a holdover from when these patches were going to apply to more than SRR
+                    __instance.AuditMusicTwo();
+#endif
+
+                    __result = ___musicSource;
+                    return false;
+                }
+                if (___musicSourcePrevious != null)
+                {
+                    StandoutLog($"source {sound} ping 3");
+                    Resources.UnloadAsset(___musicSourcePrevious.clip);
+                    ___musicSourcePrevious.Stop();
+                    ___musicSourcePrevious.clip = null;
+                }
+                StandoutLog($"source {sound} ping 4");
+                ___musicSourcePrevious = ___musicSource;
+                ___musicSourceNamePrevious = ___musicSourceName;
+                ___musicSource = SoundManager.GetUnusedSource(SoundManager.SoundType.Music);
+                ___musicSourceName = sound;
+                StandoutLog($"source {sound} ping 4.1  musicSource.loop:{___musicSource.loop}: playOnAwake:{___musicSource.playOnAwake}:");
+                AudioClip audioClip = GetClipFromPath("Music/" + sound);
+                StandoutLog($"source {sound} ping 4.2");
+
+                if (audioClip == null)
+                {
+                    StandoutLog($"source {sound} ping 5");
+                    audioClip = Resources.Load("Music/" + sound, typeof(AudioClip)) as AudioClip;
+                }
+
+                if (audioClip != null)
+                {
+                    StandoutLog($"source {sound} ping 6");
+                    ___musicSource.clip = audioClip;
+                    ___musicSource.loop = true;
+                }
+                StandoutLog($"source {sound} ping 7  musicSource.loop:{___musicSource.loop}: playOnAwake:{___musicSource.playOnAwake}:");
+#if !SRR
+// a holdover from when these patches were going to apply to more than SRR
+                __instance.AuditMusicTwo();
+#endif
+
+                __result = ___musicSource;
+                return false;
+            }
+#endif
+        }
+#endif
+
     }
 }
