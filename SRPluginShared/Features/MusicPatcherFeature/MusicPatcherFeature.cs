@@ -41,17 +41,11 @@ namespace SRPlugin.Features.MusicPatcherFeature
                                 nameof(ResourcesPatch.LoadPostfixWithPathAndType)
                                 )
                         ),
-#if SRR
+#if PATCHSOUNDMANAGER
                     PatchRecord.Prefix(
                         //typeof(SoundManager).GetMethod("SetupMusicPrefab"),
                         AccessTools.Method(typeof(SoundManager), "SetupMusicPrefab"),
                         typeof(SoundManagerPatch).GetMethod(nameof(SoundManagerPatch.SetupMusicPrefabPrefix))
-                        ),
-#endif
-#if !SRR && SRR
-                    PatchRecord.Prefix(
-                        AccessTools.Method(typeof(SoundManager), "SetupMusicSource"),
-                        typeof(SoundManagerPatch).GetMethod(nameof(SoundManagerPatch.SetupMusicSourcePrefix))
                         ),
 #endif
                 })
@@ -261,30 +255,18 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
             }
         }
 
-        private static bool IsMusicAssetPath(string assetPath)
+        private static AudioClip GetReplacementUnityObjectFromFile(string filePath)
         {
-            return assetPath.StartsWith("Music/") && assetPath.Length > 6;
-        }
+            AudioClipBox clipHolder = new AudioClipBox();
 
-        private static AudioClip GetReplacementUnityObjectFromFile(string assetPath, string filePath)
-        {
-            if (IsMusicAssetPath(assetPath))
-            {
-                AudioClipBox clipHolder = new AudioClipBox();
+            var uri = new Uri(filePath);
+            var wenum = GetWWWAudioClip(uri.ToString(), clipHolder);
 
-                var uri = new Uri(filePath);
-                var wenum = GetWWWAudioClip(uri.ToString(), clipHolder);
+            // waiting for the thing to complete the fetch
+            while (wenum.MoveNext()) ;
 
-                // waiting for the thing to complete the fetch
-                while (wenum.MoveNext()) ;
-
-                // and clipHolder should now have our audioClip!
-                var uo = clipHolder.clip;
-
-                return uo;
-            }
-
-            return null;
+            // and clipHolder should now have our audioClip!
+            return clipHolder.clip;
         }
 
         private static void StandoutLog(string msg, params object[] args)
@@ -294,19 +276,6 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
         }
 
         private static void PostfixLoad(ref UnityEngine.Object __result, string path)
-        {
-#if SRR && !SRR
-            if (!path.EndsWith("-Prefab"))
-            {
-                PostfixLoad_AudioClip(ref __result, path);
-                return;
-            }
-#else
-            PostfixLoad_AudioClip(ref __result, path);
-#endif
-        }
-
-        private static void PostfixLoad_AudioClip(ref UnityEngine.Object __result, string path)
         {
             AudioClip clip = GetClipFromPath(path);
             if (clip == null)
@@ -334,7 +303,7 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
             {
                 string filePath = ReplacementAssetLocations[path];
 
-                AudioClip uobj = GetReplacementUnityObjectFromFile(path, filePath);
+                AudioClip uobj = GetReplacementUnityObjectFromFile(filePath);
 
                 if (uobj == null)
                 {
@@ -381,15 +350,11 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
             return;
         }
 
-        private static void LogMusicAssetRequest(string path, Type systemTypeInstance = null)
+        private static void LogMusicAssetRequest(string path)
         {
             if (!LogMusicAssetsRequested) return;
 
-            var label = 
-                systemTypeInstance == null
-                ? $".asset = {path})"
-                : $".asset = {path} (expecting typeof {systemTypeInstance}, this is probably not interesting)"
-                ;
+            var label = $".asset = {path}";
 
             var msg = "";
             if (path.EndsWith("-Prefab"))
@@ -398,6 +363,18 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
             }
 
             StandoutLog($"LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL\n{label}{msg}");
+        }
+
+        private static bool IsMusicAssetPath(string assetPath)
+        {
+            bool isMusicPath = assetPath.StartsWith("Music/") && assetPath.Length > 6;
+
+            if (isMusicPath)
+            {
+                LogMusicAssetRequest(assetPath);
+            }
+
+            return isMusicPath && !assetPath.EndsWith("-Prefab");
         }
 
         [HarmonyPatch(typeof(Resources))]
@@ -414,8 +391,6 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
             {
                 if (!IsMusicAssetPath(path)) return;
 
-                LogMusicAssetRequest(path, systemTypeInstance );
-
                 PostfixLoad(ref __result, path);
             }
 
@@ -429,13 +404,11 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
             {
                 if (!IsMusicAssetPath(path)) return;
 
-                LogMusicAssetRequest(path);
-
                 PostfixLoad(ref __result, path);
             }
         }
 
-#if SRR
+#if PATCHSOUNDMANAGER
         [HarmonyPatch(typeof(SoundManager))]
         public class SoundManagerPatch
         {
@@ -476,7 +449,6 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
                             CloneGameObjectAudioClip("Music/" + sound, ___musicSource);
 
 #if !SRR
-// a holdover from when these patches were going to apply to more than SRR
                             __instance.AuditMusicTwo();
 #endif
                             __result = ___musicSource;
@@ -524,7 +496,6 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
                         }
                     }
 #if !SRR
-// a holdover from when these patches were going to apply to more than SRR
                     __instance.AuditMusicTwo();
 #endif
                 }
@@ -538,88 +509,6 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
                 __result = ___musicSource;
                 return false;
             }
-
-#if !SRR && SRR
-// a holdover from when these patches were going to apply to more than SRR
-// variables are purposefully set to be false always
-// want to retain the code but never risk compiling it
-            [HarmonyPrefix]
-            [HarmonyPatch(typeof(SoundManager), "SetupMusicSource")]
-            public static bool SetupMusicSourcePrefix(ref AudioSource __result, SoundManager __instance, string sound,
-                ref GameObject ___musicObject, ref GameObject ___musicObjectPrevious, ref string ___musicSourceName, ref string ___musicSourceNamePrevious,
-                ref AudioSource ___musicSource, ref AudioSource ___musicSourcePrevious)
-            {
-
-                StandoutLog($"source {sound} ping 0");
-                if (string.Compare(___musicSourceName, sound, StringComparison.OrdinalIgnoreCase) == 0)
-                {
-                    StandoutLog($"source {sound} ping 1");
-                    CloneGameObjectAudioClip("Music/" + sound, ___musicSource);
-#if !SRR
-// a holdover from when these patches were going to apply to more than SRR
-                    __instance.AuditMusicTwo();
-#endif
-
-                    __result = ___musicSource;
-                    return false;
-                }
-                if (string.Compare(___musicSourceNamePrevious, sound, StringComparison.OrdinalIgnoreCase) == 0)
-                {
-                    StandoutLog($"source {sound} ping 2");
-                    ___musicSource.Stop();
-                    AudioSource audioSource = ___musicSource;
-                    ___musicSourceNamePrevious = ___musicSourceName;
-                    ___musicSource = ___musicSourcePrevious;
-                    ___musicSourceName = sound;
-                    ___musicSourcePrevious = audioSource;
-
-                    CloneGameObjectAudioClip("Music/" + sound, ___musicSource);
-#if !SRR
-// a holdover from when these patches were going to apply to more than SRR
-                    __instance.AuditMusicTwo();
-#endif
-
-                    __result = ___musicSource;
-                    return false;
-                }
-                if (___musicSourcePrevious != null)
-                {
-                    StandoutLog($"source {sound} ping 3");
-                    Resources.UnloadAsset(___musicSourcePrevious.clip);
-                    ___musicSourcePrevious.Stop();
-                    ___musicSourcePrevious.clip = null;
-                }
-                StandoutLog($"source {sound} ping 4");
-                ___musicSourcePrevious = ___musicSource;
-                ___musicSourceNamePrevious = ___musicSourceName;
-                ___musicSource = SoundManager.GetUnusedSource(SoundManager.SoundType.Music);
-                ___musicSourceName = sound;
-                StandoutLog($"source {sound} ping 4.1  musicSource.loop:{___musicSource.loop}: playOnAwake:{___musicSource.playOnAwake}:");
-                AudioClip audioClip = GetClipFromPath("Music/" + sound);
-                StandoutLog($"source {sound} ping 4.2");
-
-                if (audioClip == null)
-                {
-                    StandoutLog($"source {sound} ping 5");
-                    audioClip = Resources.Load("Music/" + sound, typeof(AudioClip)) as AudioClip;
-                }
-
-                if (audioClip != null)
-                {
-                    StandoutLog($"source {sound} ping 6");
-                    ___musicSource.clip = audioClip;
-                    ___musicSource.loop = true;
-                }
-                StandoutLog($"source {sound} ping 7  musicSource.loop:{___musicSource.loop}: playOnAwake:{___musicSource.playOnAwake}:");
-#if !SRR
-// a holdover from when these patches were going to apply to more than SRR
-                __instance.AuditMusicTwo();
-#endif
-
-                __result = ___musicSource;
-                return false;
-            }
-#endif
         }
 #endif
 
