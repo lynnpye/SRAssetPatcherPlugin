@@ -1,15 +1,31 @@
 # SRAssetPatcherPlugin
-BepInEx based mod. 
+This is based on [SRPluginTemplate](https://github.com/lynnpye/SRPluginTemplate).
 
-This is based on SRPlugin.
+The goal of this mod is to allow on-the-fly asset replacement from disk for assets requested by name. The purpose is to avoid needing to do things like rebundle campaign assets just to replace music.
 
-Okay, let's be real here folks, this is a rough draft. I have tested it with exactly one clip, with an assetName of "Music/HongKong-TitleTheme-UI", which I used this plugin to swap in for the starting music.
-Your .cfg would look something like this:
+Because music swapping was my initial focus, that is the only replacement feature I have working at the moment.
+
+## MusicPatcher feature
+This requires the `MusicPatcherEnabled` feature flag to be set to `true`.
+
+I use the `UnityEngine.WWW` class to load music files from disk, so any music file formats it recognizes should be able to load. I did find that attempting to use it to load MP3 files does not appear to work.
+However I have tested with WAV and OGG and these seem to work fine.
+
+There is another feature flag, `LogMusicAssetsRequested`, which if set to `true` will print Music assets that are requested by name, based on HBS's naming convention of prefixing Music assets with `'Music/'`.
+This may be helpful if you're fishing around for music asset names. This flags defaults to `false`.
+
+Additionally, HBS seems to have made music prefabs, which start with `Music/` and end with `-Prefab` by convention. When using `LogMusicAssetsRequested`, if it sees one of these it will call it as well.
+
+For your file paths, you can specify full paths or relative paths. Relative paths are relative to [UnityEngine.Application.persistentDataPath](https://docs.unity3d.com/ScriptReference/Application-persistentDataPath.html).
+On your first launch with the plugin, it will generate a .cfg file with the persistentDataPath location called out in a comment. On Windows this is typically at `C:\Users\<user>\AppData\LocalLow\<Harebrained Schemes>\<game folder>\`.
+
+Here is an example:
 
 	[Features]
 	MusicPatcherEnabled = true
+	LogMusicAssetsRequested = true
 	
-	[Replacements]
+	[MusicReplacements]
 	
 	whatever-you-want.asset = Music/HongKong-TitleTheme-UI
 	whatever-you-want.file = ..\musicpatches\theme.wav
@@ -17,18 +33,21 @@ Your .cfg would look something like this:
 	aslong-asit-matches.asset = Music/Surely-There-Must-Be-Others
 	aslong-asit-matches.file = ..\..\some\other\folder\anotherwav.wav
 
+In this example, we can see:
 
-And right now it only even attempts to work by converting a .WAV on disk to an AudioClip, and only specifically for Music requests. I plan to add more functionality.
-
-This is no longer true, as I've switched to using the UnityEngine.WWW class do the loading, which means I can now *drumroll* handle WAV *and* OGG. Yay.
-
->At the moment, the WAV to AudioClip conversion is courtesy of [WavUtility.cs by deadlyfingers](https://github.com/deadlyfingers/UnityWav). Thank you, deadlyfingers.
-
-I would not have gone as far as I have without that code to start with.
-
-That said, yes, I would like to see this expanded to allow for more dynamic loading options. And efficiently, too. The current implementation does no caching, for example. But.... beyond all of that... yes, the following could be said:
-
-Allows dynamically replacing music tracks without needing to work with asset bundles. Just drop your replacement tracks into the appropriate folder, modify the .cfg file, install the plugin, and launch the game!
+- `[Features]` - the section where features are enabled/disabled
+- `MusicPatcherEnable = true` - this enables the Music Patcher feature; in the future there may be other asset patching options which will have their own feature flags; if this is not true, anything in `[MusicReplacements]` will be ignored
+- `LogMusicAssetsRequested = true` - this enables logging of music asset requests to aid in finding asset names to replace
+- `[MusicReplacements]` - the section where replacement information is configred
+- `whatever-you-want.asset = Music/HongKong-TitleTheme-UI`
+	- `whatever-you-want` - you can use any replacement key you want to for this portion, but it has to have both the `.asset` and `.file` entries to process correctly
+	- `.asset` - this marks this entry as the `.asset` part of the replacement pair; whatever value you provide here is what the code will respond to when requests to load by that name come in
+	- `Music/HongKong-TitleTheme-UI` - this is the asset name that SRHK loads for the title screen; for DFDC this is `Music/Berlin-TitleTheme` and for SRR it is `Music/Seattle-TitleTheme`
+- `whatever-you-want.file = ..\musicpatches\theme.wav`
+	- `.file` - this marks this entry as the `.file` part of the replacement pair; see `.asset` above; this can be a full path or relative to the persistentDataPath for Unity
+- `aslong-asit-matches.asset = Music/Surely-There-Must-Be-Others`
+	- `aslong-asit-matches` - this is a new replacement key, representing a different pair of asset/file
+	- `Music/Surely-There-Must-Be-Others` - and there are!; this would be another asset you are searching for
 
 To use this mod:
 
