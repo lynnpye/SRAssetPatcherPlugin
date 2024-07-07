@@ -21,17 +21,19 @@ On your first launch with the plugin, it will generate a .cfg file with the pers
 
 Here is an example:
 
-	[Features]
-	MusicPatcherEnabled = true
-	LogMusicAssetsRequested = true
+```
+[Features]
+MusicPatcherEnabled = true
+LogMusicAssetsRequested = true
 	
-	[MusicReplacements]
-	
-	whatever-you-want.asset = Music/HongKong-TitleTheme-UI
-	whatever-you-want.file = ..\musicpatches\theme.wav
-	
-	aslong-asit-matches.asset = Music/Surely-There-Must-Be-Others
-	aslong-asit-matches.file = ..\..\some\other\folder\anotherwav.wav
+[MusicReplacements]
+
+whatever-you-want.asset = Music/HongKong-TitleTheme-UI
+whatever-you-want.file = ..\musicpatches\theme.wav
+
+aslong-asit-matches.asset = Music/Surely-There-Must-Be-Others
+aslong-asit-matches.file = ..\..\some\other\folder\anotherwav.wav
+```
 
 In this example, we can see:
 
