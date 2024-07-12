@@ -7,7 +7,7 @@ namespace DFDCAssetPatcherPlugin
     {
         private void Awake()
         {
-            SRPlugin.SRPlugin.Awaken(() => this.Config, () => this.Logger);
+            SRPlugin.SRPlugin.Awaken(this);
    
             // If you aren't managing your Harmony patching directly
             // If you plan to just enable all of your patches immediately
@@ -20,7 +20,6 @@ namespace DFDCAssetPatcherPlugin
             // either of those will search your .dll for properly annotated classes
             // and apply their patches.
 
-            Logger.LogInfo($"Plugin {PluginInfo.PLUGIN_NAME} {PluginInfo.PLUGIN_GUID} is loaded!");
         }
     }
 }

@@ -9,11 +9,11 @@
     <Import_RootNamespace>SRPlugin</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)ConfigFileExtension.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)FeatureImpl.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Features\MusicPatcherFeature\MusicPatcherFeature.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)OverrideableValue.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)PatchRecord.cs" />
-    <Compile Include="..\SRPluginShared\PrivateEye.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)SRPlugin.cs" />
   </ItemGroup>
 </Project>

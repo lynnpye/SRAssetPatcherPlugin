@@ -13,34 +13,20 @@ namespace SRPlugin.Features.MusicPatcherFeature
         private static ConfigItem<bool> CILogMusicAssetsRequested;
 
         public MusicPatcherFeature()
-            : base(new List<ConfigItemBase>
+            : base(
+                nameof(MusicPatcherEnabled),
+                new List<ConfigItemBase>
                 {
-                    (CIMusicPatcherEnabled = new ConfigItem<bool>(FEATURES_SECTION, nameof(MusicPatcherEnabled), true, GetLongDescription())),
-                    (CILogMusicAssetsRequested = new ConfigItem<bool>(FEATURES_SECTION, nameof(LogMusicAssetsRequested), false, "outputs each asset request prefixed with the string 'Music/', to help aid in finding a specific music asset name")),
+                    (CIMusicPatcherEnabled = new ConfigItem<bool>(PLUGIN_FEATURES_SECTION, nameof(MusicPatcherEnabled), true, GetLongDescription())),
+                    (CILogMusicAssetsRequested = new ConfigItem<bool>(nameof(LogMusicAssetsRequested), false, "outputs each asset request prefixed with the string 'Music/', to help aid in finding a specific music asset name")),
                 }, new List<PatchRecord>()
                 {
                     PatchRecord.Postfix(
-                        typeof(Resources)
-                            .GetMethod(
-                                nameof(Resources.Load),
-                                [typeof(string)]
-                            ),
-                        typeof(ResourcesPatch)
-                            .GetMethod(
-                                nameof(ResourcesPatch.LoadPostfixWithPath)
-                                )
-                        ),
+                        typeof(Resources).GetMethod(nameof(Resources.Load),[typeof(string)]),
+                        typeof(ResourcesPatch).GetMethod(nameof(ResourcesPatch.LoadPostfixWithPath))),
                     PatchRecord.Postfix(
-                        typeof(Resources)
-                            .GetMethod(
-                                nameof(Resources.Load),
-                                [typeof(string), typeof(Type)]
-                            ),
-                        typeof(ResourcesPatch)
-                            .GetMethod(
-                                nameof(ResourcesPatch.LoadPostfixWithPathAndType)
-                                )
-                        ),
+                        typeof(Resources).GetMethod(nameof(Resources.Load),[typeof(string), typeof(Type)]),
+                        typeof(ResourcesPatch).GetMethod(nameof(ResourcesPatch.LoadPostfixWithPathAndType))),
 #if PATCHSOUNDMANAGER
                     PatchRecord.Prefix(
                         //typeof(SoundManager).GetMethod("SetupMusicPrefab"),
@@ -65,8 +51,6 @@ namespace SRPlugin.Features.MusicPatcherFeature
 
         private static Dictionary<string, AudioClip> ReplacementAssetSamples = new Dictionary<string, AudioClip>();
         private static Dictionary<string, AudioClipDataBucket> ReplacementAssetDataBuckets = new Dictionary<string, AudioClipDataBucket>();
-
-        private static string REPLACEMENTS_SECTION = "MusicReplacements";
 
         public class AudioClipDataBucket
         {
@@ -109,7 +93,7 @@ namespace SRPlugin.Features.MusicPatcherFeature
             // may I find comfort from a higher power
             private static HashSet<int> _knownClips = new HashSet<int>();
             private static HashSet<int> KnownClips { get => _knownClips ??= new HashSet<int>(); }
-            
+
             public AudioClip ClipFromBucket()
             {
                 var newClip = AudioClip.Create(this.name, this.samples.Length, this.channels, this.frequency, false, false);
@@ -163,7 +147,8 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
         {
             // let's get the list of things we should be replacing ready before patching to allow us to replace them
             // we aren't binding, so these are going to only exist as OrphanedEntries, which is private
-            Dictionary<ConfigDefinition, string> orphans = PrivateEye.GetPrivateGetterValue<Dictionary<ConfigDefinition, string>>(SRPlugin.ConfigFile, "OrphanedEntries", null);
+            Dictionary<ConfigDefinition, string> orphans =
+                AccessTools.PropertyGetter(typeof(ConfigFile), "OrphanedEntries").Invoke(SRPlugin.ConfigFile, null) as Dictionary<ConfigDefinition, string>;
 
             if (orphans == null)
             {
@@ -175,7 +160,7 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
 
             foreach (var key in orphans.Keys)
             {
-                if (!REPLACEMENTS_SECTION.Equals(key.Section, StringComparison.OrdinalIgnoreCase)) continue;
+                if (!FEATURES_SETTINGS_SECTION(typeof(MusicPatcherFeature)).Equals(key.Section, StringComparison.OrdinalIgnoreCase)) continue;
 
                 string keyname = key.Key;
 
@@ -222,7 +207,7 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
         public static string GetFullPath(string filePath)
         {
             var root = Path.GetPathRoot(filePath);
-            if (!(root.StartsWith(@"\") || root.EndsWith(@"\") && root != @"\"))
+            if (!(root.StartsWith(@"\") || (root.EndsWith(@"\") && root != @"\")))
             {
                 filePath = Path.GetFullPath(Path.Combine(Application.persistentDataPath, filePath));
             }
@@ -335,7 +320,7 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
             {
                 return;
             }
-            
+
             AudioClip clip = GetClipFromPath(path);
 
             if (clip != null)
@@ -343,7 +328,7 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
                 resultAudioSource.clip = clip;
                 resultAudioSource.loop = true;
                 resultAudioSource.playOnAwake = true;
-                
+
                 return;
             }
 
@@ -481,8 +466,8 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
                     GameObject gameObject3 = unusedSource.gameObject;
                     ___musicObject.transform.parent = unusedSource.gameObject.transform.parent;
 
-                    int[] numSources = PrivateEye.GetPrivateFieldValue<int[]>(LazySingletonBehavior<SoundManager>.Instance, "numSources", null);
-                    AudioSource[,] sources = PrivateEye.GetPrivateFieldValue<AudioSource[,]>(LazySingletonBehavior<SoundManager>.Instance, "sources", null);
+                    int[] numSources = AccessTools.Field(typeof(SoundManager), "numSources").GetValue(LazySingletonBehavior<SoundManager>.Instance) as int[];
+                    AudioSource[,] sources = AccessTools.Field(typeof(SoundManager), "sources").GetValue(LazySingletonBehavior<SoundManager>.Instance) as AudioSource[,];
                     for (int i = 0; i < numSources[num]; i++)
                     {
                         if (sources[num, i] == unusedSource)

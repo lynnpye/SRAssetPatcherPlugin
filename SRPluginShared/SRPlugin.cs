@@ -1,4 +1,5 @@
-﻿using BepInEx.Configuration;
+﻿using BepInEx;
+using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using System;
@@ -9,69 +10,55 @@ using UnityEngine;
 
 namespace SRPlugin
 {
-    public delegate ConfigFile GetConfigFileDelegate();
-    public delegate ManualLogSource GetLoggerDelegate();
-
     public static class SRPlugin
     {
-        public static string HarmonyID { get; private set; }
+        private static string _assemblyPath = null;
+        private static List<FeatureImpl> _featureImpls = null;
+        private static string _featureSectionName = null;
+        private static string _harmonyID = null;
+        private static ManualLogSource _logger = null;
+
+        public static string AssemblyPath { get => _assemblyPath ??= Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location); }
+        public static string AssetOverrideRoot { get => Application.persistentDataPath; }
+        public static BaseUnityPlugin Plugin { get; private set; }
+        public static ConfigFile ConfigFile { get => Plugin.Config; }
+        public static List<FeatureImpl> FeatureImpls { get => _featureImpls ??= PopulateFeaturesInfo(); }
+        public static string FeatureSectionName { get => _featureSectionName ?? $"_{PluginName} Features"; private set => _featureSectionName = value; }
+        public static string HarmonyID { get => _harmonyID ??= $"{Guid.NewGuid().ToString()}"; }
         public static Harmony Harmony { get; private set; }
-        private static GetConfigFileDelegate GetConfigFile;
-        private static GetLoggerDelegate GetLogger;
-        private static string _assemblyPath;
+        public static ManualLogSource Logger { get => _logger ??= AccessTools.PropertyGetter(Plugin.GetType(), "Logger").Invoke(Plugin, null) as ManualLogSource; }
+        public static string PluginName { get => Plugin.Info.Metadata.Name; }
+        public static string PluginGUID { get => Plugin.Info.Metadata.GUID; }
+        public static Version PluginVersion { get => Plugin.Info.Metadata.Version; }
+        public static Version PreviousPluginVersion { get; private set; }
 
-        public static string AssemblyPath
+        public static void Squawk(string msg, params object[] args)
         {
-            get
-            {
-                if (_assemblyPath == null)
-                {
-                    _assemblyPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-                }
-                return _assemblyPath;
-            }
+            Logger.LogInfo($"\nXXXX {PluginName} Squawk XXXX\n\n{string.Format(msg, args)}\n\nXXXXXXXXXXXXXXXXXXXXXXXXX");
         }
 
-        public static string AssetOverrideRoot
+        public static void Awaken(BaseUnityPlugin plugin, string featureSectionName = null)
         {
-            get
-            {
-#if false
-                if (_assemblyPath == null)
-                {
-                    _assemblyPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-                }
-                return _assemblyPath;
-#endif
-                return Application.persistentDataPath;
-            }
-        }
+            Plugin = plugin;
+            FeatureSectionName = featureSectionName;
 
-        public static ConfigFile ConfigFile
-        {
-            get
-            {
-                return GetConfigFile.Invoke();
-            }
-        }
-
-        public static ManualLogSource Logger
-        {
-            get
-            {
-                return GetLogger.Invoke();
-            }
-        }
-
-        public static void Awaken(GetConfigFileDelegate configFileDelegate, GetLoggerDelegate loggerDelegate)
-        {
-            GetConfigFile = configFileDelegate;
-            GetLogger = loggerDelegate;
-
-            HarmonyID = $"{Guid.NewGuid().ToString()}";
             Harmony = new Harmony(HarmonyID);
 
-            InitializeFeatures();
+            // initializing to v9.0, to force an update on next deployment
+            ConfigEntry<string> ciPreviousPluginVersionString =
+                SRPlugin.ConfigFile.Bind<string>(
+                    SRPlugin.FeatureSectionName,
+                    nameof(PluginVersion),
+                    null,
+                    "readonly setting to mark the version for which this config was generated; changing this will not generally be helpful"
+                );
+            PreviousPluginVersion = new Version(ciPreviousPluginVersionString.Value ?? new Version(1, 0).ToString());
+            ciPreviousPluginVersionString.Value = PluginVersion.ToString();
+
+            foreach (var f in FeatureImpls)
+            {
+                f.Initialize();
+            }
 
             // If you aren't managing your Harmony patching directly
             // If you plan to just enable all of your patches immediately
@@ -83,37 +70,15 @@ namespace SRPlugin
             //      HarmonyInst.PatchAll(assembly);
             // either of those will search your .dll for properly annotated classes
             // and apply their patches.
+
+            Logger.LogInfo($"Plugin {PluginName} {PluginVersion} is loaded!");
         }
 
-        public static void InitializeFeatures()
+        private static List<FeatureImpl> PopulateFeaturesInfo(bool forceReload = false)
         {
-            foreach (var f in FeatureImpls)
-            {
-                f.Initialize();
-            }
-        }
-
-        private static List<FeatureImpl> featureImpls = new List<FeatureImpl>();
-
-        private static List<FeatureImpl> FeatureImpls
-        {
-            get
-            {
-                PopulateFeaturesInfo();
-                return featureImpls;
-            }
-        }
-
-        private static void PopulateFeaturesInfo(bool forceReload = false)
-        {
-            if (featureImpls == null) featureImpls = new List<FeatureImpl>();
-
-            if (!forceReload && featureImpls.Count > 0) return;
-
-            featureImpls.Clear();
+            List<FeatureImpl> featureImpls = new List<FeatureImpl>();
 
             Assembly assembly = Assembly.GetExecutingAssembly();
-
             try
             {
                 Type fImpl = typeof(FeatureImpl);
@@ -124,12 +89,13 @@ namespace SRPlugin
                         featureImpls.Add(Activator.CreateInstance(type) as FeatureImpl);
                     }
                 }
-
             }
             catch (ReflectionTypeLoadException ex)
             {
                 Console.WriteLine($"Error finding Feature implementations in assembly '{assembly.FullName}': {ex.Message}");
             }
+
+            return featureImpls;
         }
     }
 }
