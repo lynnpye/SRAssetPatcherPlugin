@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-namespace SRPlugin.Features.MusicPatcherFeature
+namespace SRPlugin.Features.MusicPatcher
 {
     internal class MusicPatcherFeature : FeatureImpl
     {
@@ -14,27 +14,21 @@ namespace SRPlugin.Features.MusicPatcherFeature
 
         public MusicPatcherFeature()
             : base(
-                nameof(MusicPatcherEnabled),
+                nameof(MusicPatcher),
                 new List<ConfigItemBase>
                 {
-                    (CIMusicPatcherEnabled = new ConfigItem<bool>(PLUGIN_FEATURES_SECTION, nameof(MusicPatcherEnabled), true, GetLongDescription())),
+                    (CIMusicPatcherEnabled = new ConfigItem<bool>(PLUGIN_FEATURES_SECTION, nameof(MusicPatcher), true, GetLongDescription())),
                     (CILogMusicAssetsRequested = new ConfigItem<bool>(nameof(LogMusicAssetsRequested), false, "outputs each asset request prefixed with the string 'Music/', to help aid in finding a specific music asset name")),
-                }, new List<PatchRecord>()
-                {
-                    PatchRecord.Postfix(
-                        typeof(Resources).GetMethod(nameof(Resources.Load),[typeof(string)]),
-                        typeof(ResourcesPatch).GetMethod(nameof(ResourcesPatch.LoadPostfixWithPath))),
-                    PatchRecord.Postfix(
-                        typeof(Resources).GetMethod(nameof(Resources.Load),[typeof(string), typeof(Type)]),
-                        typeof(ResourcesPatch).GetMethod(nameof(ResourcesPatch.LoadPostfixWithPathAndType))),
+                }, new List<PatchRecord>(
+                    PatchRecord.RecordPatches(
+                        typeof(ResourcesPatch).GetMethod(nameof(ResourcesPatch.LoadPostfixWithPath)),
+                        typeof(ResourcesPatch).GetMethod(nameof(ResourcesPatch.LoadPostfixWithPathAndType))
 #if PATCHSOUNDMANAGER
-                    PatchRecord.Prefix(
-                        //typeof(SoundManager).GetMethod("SetupMusicPrefab"),
-                        AccessTools.Method(typeof(SoundManager), "SetupMusicPrefab"),
-                        typeof(SoundManagerPatch).GetMethod(nameof(SoundManagerPatch.SetupMusicPrefabPrefix))
-                        ),
+                        , typeof(SoundManagerPatch).GetMethod(nameof(SoundManagerPatch.SetupMusicPrefabPrefix))
 #endif
-                })
+                    )
+                )
+            )
         {
 
         }
@@ -90,9 +84,7 @@ namespace SRPlugin.Features.MusicPatcherFeature
                 this.hideFlags = audioClip.hideFlags;
             }
 
-            // may I find comfort from a higher power
-            private static HashSet<int> _knownClips = new HashSet<int>();
-            private static HashSet<int> KnownClips { get => _knownClips ??= new HashSet<int>(); }
+            private static HashSet<int> KnownClips = new();
 
             public AudioClip ClipFromBucket()
             {
@@ -374,7 +366,7 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
                 )]
             public static void LoadPostfixWithPathAndType(ref UnityEngine.Object __result, string path, Type systemTypeInstance)
             {
-                if (!IsMusicAssetPath(path)) return;
+                if (!MusicPatcherEnabled || !IsMusicAssetPath(path)) return;
 
                 PostfixLoad(ref __result, path);
             }
@@ -387,7 +379,7 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
                 )]
             public static void LoadPostfixWithPath(ref UnityEngine.Object __result, string path)
             {
-                if (!IsMusicAssetPath(path)) return;
+                if (!MusicPatcherEnabled || !IsMusicAssetPath(path)) return;
 
                 PostfixLoad(ref __result, path);
             }
@@ -403,6 +395,8 @@ MusicPatcherEnabled = true|false -- is this music patcher feature to be enabled?
                 ref GameObject ___musicObject, ref GameObject ___musicObjectPrevious, ref string ___musicSourceName, ref string ___musicSourceNamePrevious,
                 ref AudioSource ___musicSource, ref AudioSource ___musicSourcePrevious)
             {
+                if (!MusicPatcherEnabled) return true;
+
                 if (___musicObject != null)
                 {
                     if (string.Compare(___musicSourceName, sound, StringComparison.OrdinalIgnoreCase) == 0)

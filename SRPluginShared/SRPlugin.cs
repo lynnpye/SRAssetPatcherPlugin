@@ -40,6 +40,10 @@ namespace SRPlugin
         public static void Awaken(BaseUnityPlugin plugin, string featureSectionName = null)
         {
             Plugin = plugin;
+
+            // Registering the string[] type converter
+            TomlTypeConverter.AddConverter(typeof(string[]), new StringListTypeConverter());
+
             FeatureSectionName = featureSectionName;
 
             Harmony = new Harmony(HarmonyID);
