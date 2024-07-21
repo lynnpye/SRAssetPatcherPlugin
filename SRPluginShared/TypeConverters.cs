@@ -3,47 +3,21 @@ using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace SRPlugin
 {
     public class StringListTypeConverter : TypeConverter
     {
-        public static string EscapeDoubleQuotesAndBackslashesUsingRegex(string input)
+        private static string EscapeString(string value)
         {
-            // First, escape all backslashes that are not already used for escaping
-            // This looks for a backslash that is not followed by another backslash or a double quote
-            string escapedBackslashes = System.Text.RegularExpressions.Regex.Replace(input, @"\\(?!\\|"")", @"\\\\");
-
-            // Then, escape all double quotes that are not already escaped
-            // After escaping backslashes, we can safely assume that unescaped double quotes are not preceded by a backslash
-            return System.Text.RegularExpressions.Regex.Replace(escapedBackslashes, @"(?<!\\)""", @"\""");
+            return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
         }
 
-        public string[] ParseStringArray(string input)
+        private static string UnescapeString(string value)
         {
-            // Check if the input starts and ends with square brackets
-            if (input.StartsWith("[") && input.EndsWith("]"))
-            {
-                // Remove the starting and ending square brackets
-                var trimmedInput = input.Substring(1, input.Length - 2);
-
-                // Use a regular expression to match all instances of double-quoted strings, taking escaped quotes into account
-                var matches = System.Text.RegularExpressions.Regex.Matches(trimmedInput, @"\""(?:\\.|[^\\""])*\""");
-
-                // Convert the matches to a string array
-                var result = new string[matches.Count];
-                for (int i = 0; i < matches.Count; i++)
-                {
-                    // Remove the surrounding quotes and unescape any escaped characters for each matched string
-                    result[i] = System.Text.RegularExpressions.Regex.Unescape(matches[i].Value.Substring(1, matches[i].Value.Length - 2));
-                }
-
-                return result;
-            }
-            else
-            {
-                return [];
-            }
+            return value.Replace("\\\"", "\"").Replace("\\\\", "\\");
         }
 
         public StringListTypeConverter()
@@ -62,9 +36,24 @@ namespace SRPlugin
                         return "[]";
                     }
 
-                    var stringifiedStringList = $"[\"{stringArray.ToList().Join(v => EscapeDoubleQuotesAndBackslashesUsingRegex(v), "\", \"")}\"]";
+                    var stringListBuilder = new StringBuilder();
+                    stringListBuilder.Append("[");
 
-                    return stringifiedStringList;
+                    for (int i = 0; i < stringArray.Length; i++)
+                    {
+                        stringListBuilder.Append("\"");
+                        stringListBuilder.Append(EscapeString(stringArray[i]));
+                        stringListBuilder.Append("\"");
+
+                        if (i < stringArray.Length - 1)
+                        {
+                            stringListBuilder.Append(", ");
+                        }
+                    }
+
+                    stringListBuilder.Append("]");
+
+                    return stringListBuilder.ToString();
                 }
 
                 return "[]";
@@ -72,7 +61,22 @@ namespace SRPlugin
 
             this.ConvertToObject = (string value, Type type) =>
             {
-                return ParseStringArray(value);
+                if (string.IsNullOrEmpty(value) || value == "[]")
+                {
+                    return new string[0];
+                }
+
+                var content = value.Trim('[', ']').Trim();
+                var matches = Regex.Matches(content, "\"(.*?)\"");
+
+                var result = new List<string>();
+
+                foreach (Match match in matches)
+                {
+                    result.Add(UnescapeString(match.Groups[1].Value));
+                }
+
+                return result.ToArray();
             };
         }
     }

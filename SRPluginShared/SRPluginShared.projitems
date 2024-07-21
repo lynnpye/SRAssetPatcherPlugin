@@ -11,9 +11,9 @@
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)ConfigFileExtension.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)FeatureImpl.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Features\ContentPackManager\ContentPackManagerFeature.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Features\ItemSideLoader\ItemSideLoaderFeature.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Features\MusicPatcher\MusicPatcherFeature.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Features\ContentPackDependencyInjector\ContentPackDependencyInjectorFeature.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)OverrideableValue.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)PatchRecord.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)SRPlugin.cs" />

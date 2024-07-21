@@ -56,6 +56,17 @@ To use this mod:
 ## Install BepInEx
 Go to the [BepInEx Releases page](https://github.com/BepInEx/BepInEx/releases/) and download BepInEx_win_x86_5.4.23.2.zip [(link to the release tag)](https://github.com/BepInEx/BepInEx/releases/tag/v5.4.23.2) [(direct link to the zip)](https://github.com/BepInEx/BepInEx/releases/download/v5.4.23.2/BepInEx_win_x86_5.4.23.2.zip) and install it to your game folder as normal.
 
+### This is why I add a modified copy of BepInEx.cfg to each of the plugins I release...
+At least for me...
+
+When I first installed BepInEx, with no preconfigured BepInEx.cfg, the game crashed on startup, but left behind a new copy of
+BepInEx.cfg. BepInEx documentation mentioned possibly needing to make changes as described below to get the bootstrapping
+working correctly. I made the following changes and that let things proceed for everything I tried to do. Understand that
+this is technically a non-default configuration, but it works for me.
+
+### So, here's what I did, and I should probably just add the default BepInEx.cfg to my plugins somewhere...
+I'm going to copy this all back to SRPluginTemplate anyway since that's technically home base for me. :)
+
 Run the game once now that BepInEx is installed. The game will likely crash. If it does not, exit the game as soon as the main menu appears.
 
 When installing BepInEx to the game folder, a 'BepInEx/' folder was created. There should now be a 'config/' subfolder containing 'BepInEx.cfg'.
