@@ -12,8 +12,6 @@ mkdir working
 for %%p in (SRRAssetPatcherPlugin
 DFDCAssetPatcherPlugin
 SRHKAssetPatcherPlugin) do (
-rmdir /q /s %%p
-del %%p.zip
 xcopy /e /i ModBepInExCfg working\%%p
 REM no longer going to ship a starter .cfg
 REM xcopy configs\%%p.cfg working\%%p\BepInEx\config
