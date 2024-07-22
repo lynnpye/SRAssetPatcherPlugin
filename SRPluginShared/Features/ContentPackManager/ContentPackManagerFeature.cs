@@ -114,18 +114,31 @@ namespace SRPlugin.Features.ContentPackManager
          * experience. Hypothetically.
          */
 
-        private static ConfigItem<bool> CIContentPackDependencyInjectorEnabled;
+        private static ConfigItem<bool> CIContentPackManagerEnabled;
         private static ConfigItem<string[]> CIAppendedContentPackFolders;
         private static ConfigItem<string[]> CIContentPackInjections;
+        private static ConfigItem<bool> CILogContentPackNamesResolved;
+
+        private static readonly string CONTENT_PACK_INJECTION_DESCRIPTION = 
+$@"The '{nameof(ContentPackInjections)}' configuration option is a list of strings.
+Each string can be one of two formats:
+    ""<contentPackToInject>""
+or
+    ""<contentPackToInject>=<targetContentPack1>,<targetContentPack2>,...""
+with the first form implicitly adding the contentPackToInject as a dependency for all content packs loaded.
+In the second form, the contentPackToInject will only be added as a dependency for the targetContentPacks listed.
+One useful example of this would be to add custom portraits to any campaign without rebundling their asset bundle.
+";
 
         public ContentPackManagerFeature()
             : base(
                   nameof(ContentPackManager),
                   new List<ConfigItemBase>()
                   {
-                      (CIContentPackDependencyInjectorEnabled = new ConfigItem<bool>(PLUGIN_FEATURES_SECTION, nameof(ContentPackManager), true, "custom content pack folder location and auto inject selected content packs as dependencies for loaded content")),
-                      (CIAppendedContentPackFolders = new ConfigItem<string[]>(nameof(AppendedContentPackFolders), [], "additional folders to search for content packs; it just means the game will be aware of them, they can be referenced and they will be loaded")),
-                      (CIContentPackInjections = new ConfigItem<string[]>(nameof(ContentPackInjections), [], "each injection string should take the format of either 'ContentPackName' or 'ContentPackName=TargetPack,TargetPack...' where 'ContentPackName' is what to load and 'TargetPack' is what to make it a dependency for")),
+                      (CIContentPackManagerEnabled = new ConfigItem<bool>(PLUGIN_FEATURES_SECTION, nameof(ContentPackManager), true, "custom content pack folder location and auto inject selected content packs as dependencies for loaded content")),
+                      (CIAppendedContentPackFolders = new ConfigItem<string[]>(nameof(AppendedContentPackFolders), [], "additional folders to search for content packs; placed at the end of the search path")),
+                      (CIContentPackInjections = new ConfigItem<string[]>(nameof(ContentPackInjections), [], CONTENT_PACK_INJECTION_DESCRIPTION)),
+                      (CILogContentPackNamesResolved = new ConfigItem<bool>(nameof(LogContentPackNamesResolved), false, "Output content pack names to the output_log.txt file as their dependencies are resolved")),
                   },
                   new List<PatchRecord>(
                       PatchRecord.RecordPatches(
@@ -146,9 +159,10 @@ namespace SRPlugin.Features.ContentPackManager
         {
         }
 
-        public static bool ContentPackDependencyInjectorEnabled { get => CIContentPackDependencyInjectorEnabled.GetValue(); set => CIContentPackDependencyInjectorEnabled.SetValue(value); }
+        public static bool ContentPackManagerEnabled { get => CIContentPackManagerEnabled.GetValue(); set => CIContentPackManagerEnabled.SetValue(value); }
         public static string[] AppendedContentPackFolders { get => CIAppendedContentPackFolders.GetValue(); set => CIAppendedContentPackFolders.SetValue(value); }
         public static string[] ContentPackInjections { get => CIContentPackInjections.GetValue(); set => CIContentPackInjections.SetValue(value); }
+        public static bool LogContentPackNamesResolved { get => CILogContentPackNamesResolved.GetValue(); set => CILogContentPackNamesResolved.SetValue(value); }
 
         [HarmonyPatch(typeof(FileLoader.ProjectInfo))]
         internal class ProjectInfoPatch
@@ -185,6 +199,11 @@ namespace SRPlugin.Features.ContentPackManager
             [HarmonyPatch(nameof(FileLoader.ProjectInfo.ResolveDependencies))]
             public static void ResolveDependenciesPrefix(FileLoader.ProjectInfo __instance)
             {
+                if (LogContentPackNamesResolved)
+                {
+                    SRPlugin.Squawk($"Resolve dependencies for content pack: Name='{__instance.Name}' ProjectId='{__instance.ProjectId}'");
+                }
+
                 try
                 {
                     var allContentPacks = AccessTools.Field(typeof(FileLoader), "allContentPacks").GetValue(LazySingletonBehavior<FileLoader>.Instance) as BetterList<FileLoader.ProjectInfo>;
@@ -269,7 +288,7 @@ namespace SRPlugin.Features.ContentPackManager
             {
                 try
                 {
-                    if (!ContentPackDependencyInjectorEnabled)
+                    if (!ContentPackManagerEnabled)
                     {
                         return;
                     }

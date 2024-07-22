@@ -1,9 +1,40 @@
 # SRAssetPatcherPlugin
 This is based on [SRPluginTemplate](https://github.com/lynnpye/SRPluginTemplate).
 
-The goal of this mod is to allow on-the-fly asset replacement from disk for assets requested by name. The purpose is to avoid needing to do things like rebundle campaign assets just to replace music.
+This plugin is where I'm putting any features related to modifying how the game processes assets.
 
-Because music swapping was my initial focus, that is the only replacement feature I have working at the moment.
+The original goal I had set for myself was to swap in music to replace it in an existing campaign. I worked out *a* method though perhaps not *the best* and I'm sure not *the only* method of doing this.
+It's a little ham-fisted though, as it basically involves me patching the UnityEngine Resources.Load() methods and examining each request; and then, if the asset does happen to match one I have
+a replacement for, I load the replacement from disk and return that instead. And I had to handle some edge cases where it just loads a similarly named Prefab and obtains the music from the
+AudioClip component on that prefab. So I'm handling that too. I'm looking for an improvement there. This is like taking a sledgehammer to kill a fly. Oh, and since there is also the
+downside of needing to know the asset name of the music clip you're trying to replace, I added a feature to log the asset names that are requested. Otherwise I suppose you could try to
+open the pack in the editor to take a peek, or ask the author. And as an aside, it is eery how well the auto-complete is doing in terms of approximating what I'm about to type. It's freaky weird.
+And yes, Visual Studio, also good.
+
+Okay, so in addition to some semblance of music replacement without needing to construct a new Unity asset bundle, I also wanted to be able to have custom portraits available without needing to 
+rebundle the campaign I want to play to establish dependencies. In the course of doing this, having accidentally discovered how to a) add an arbitrary location on disk to the list of searchable folders
+the game will use to find content packs and their assets, and b) how to inject a specific content pack (i.e. one of your own or several) into the dependency list of a specific other content pack
+when it's being loaded. For example, in the DFDC version of this plugin, by targeting the 'DragonfallExtended' content pack, to load my stupid portraits only content pack I made, I was able to
+start the standard story but get a warning that my custom content was going to be added, and then, yes, it found my test portrait. So that's cool. Make of it what you will.
+
+What that means for *now* is that if you use this plug-in, you could, theoretically, replace any music in any campaign you want, just by setting up the .cfg file correctly and providing
+the appropriately formatted and named music files. And you could provide one or more folders, within any of which you could put a content pack of your choosing, and then somehow forcing your
+content pack to be handed to whichever other content pack you pick, if it gets requested, in which case you will be listed as one of their dependencies. In the case of how it searches for portraits,
+this happens to be sufficient for that resources to just, be available. There appeared to be several other resources like that, but I haven't explored them yet. That would suggest that
+with some creative building of your own custom content pack, containing nothing but a bunch of .bytes (possibly generated from .json?) files in the, you know, "typical content pack layout",
+and then listing it as the base for your selection of content packs to inject into the game, you could probably do a lot of things. I'm not sure what the limits are, but this seems a nice
+start.
+
+Even if you aren't a developer, I would like to think that this plugin could be useful to you, in terms of customizing the ShadowRun experience. I put some thoughts into one of the source
+files but essentially, I'd like to imagine that someone could, with the help of this mod, just create the equivalent of a simple, text-based, config file, and be able to play a campaign's
+story with an entire set of modifications to anything from music to graphics to merchant content and weapons and really a lot of various content mod's current content. Hypothetically,
+someone could create a plugin with this approach where you could have ... themes... for lack of a better term... for how you want to play. Say you love these various UGC campaigns,
+but you just genuinely prefer to choose from a specific set of portraits, and to have ... oh.... renamed a race... or added a new one... or maybe just some bug fixes. All those mods that
+currently exist could technically re-release as BepInEx plug-ins and you could pick and choose to get whatever experience you wanted. And then with the same thing for content packs and 
+certain types of asset overrides, you could carry a very specific set of preferences with you across stories.
+
+Which brings me to another thought that I will add here because why not... there are a number of services/frameworks/etc. that provide extremely simple networking capability. Hypothetically,
+you could add some sort of networking capability through this plug-in without, again, hi-jacking the Assembly-CSharp.dll from everyone else. :)
 
 ## MusicPatcher feature
 This requires the `MusicPatcherEnabled` feature flag to be set to `true`.
@@ -51,7 +82,26 @@ In this example, we can see:
 	- `aslong-asit-matches` - this is a new replacement key, representing a different pair of asset/file
 	- `Music/Surely-There-Must-Be-Others` - and there are!; this would be another asset you are searching for
 
-To use this mod:
+## ContentPackManager feature
+This requires the 'ContentPackManagerEnabled' feature flag to be set to 'true'.
+
+There are two functions you can adjust. One is to provide a list of strings with folder locations; each folder specified will be added to the search path to find content packs on request.
+
+The other allows you to specify content packs to be added as a dependency for other content packs when loaded. The 'ContentPackInjections' configuration option is a list of strings.
+Each string can be one of two formats:
+
+    "<contentPackToInject>"
+
+or
+
+    "<contentPackToInject>=<targetContentPack1>,<targetContentPack2>,..."
+
+with the first form implicitly adding the contentPackToInject as a dependency for all content packs loaded.
+In the second form, the contentPackToInject will only be added as a dependency for the targetContentPacks listed.
+One useful example of this would be to add custom portraits to any campaign without rebundling their asset bundle.
+
+There is actually one other feature, useful for figuring out what the name of a content pack is; the 'SquawkContentPackNames' feature flag, false by default, prints out the Name and ProjectId of
+each content pack as it its dependencies are resolved. You may be able to use this to help figure out the dependencies you want to set up.
 
 ## Install BepInEx
 Go to the [BepInEx Releases page](https://github.com/BepInEx/BepInEx/releases/) and download BepInEx_win_x86_5.4.23.2.zip [(link to the release tag)](https://github.com/BepInEx/BepInEx/releases/tag/v5.4.23.2) [(direct link to the zip)](https://github.com/BepInEx/BepInEx/releases/download/v5.4.23.2/BepInEx_win_x86_5.4.23.2.zip) and install it to your game folder as normal.
